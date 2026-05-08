@@ -1,0 +1,24 @@
+{
+  "name": "add-map-image",
+  "label": "Add Map Image",
+  "type": "widget",
+  "version": "1.17.0",
+  "exbVersion": "1.17.0",
+  "author": "Moises Herrera",
+  "description": "A UI copy of map layers with the ability to bring in a map image and its sub layers. Sub layers can be toggled on and off.",
+  "copyright": "",
+  "useDataSources": true,
+  "dependency": ["jimu-arcgis"],
+  "properties": {
+    "canConsumeDataAction": true,
+    "coverLayoutBackground": true
+  },
+  "license": "http://www.apache.org/licenses/LICENSE-2.0",
+  "translatedLocales": [
+    "en"
+  ],
+  "defaultSize": {
+    "width": 800,
+    "height": 500
+  }
+}
