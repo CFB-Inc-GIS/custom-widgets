@@ -3,8 +3,8 @@ import _Widget from '../src/runtime/widget'
 import { widgetRender, wrapWidget } from 'jimu-for-test'
 
 const render = widgetRender()
-describe('test simple widget', () => {
-  it('simple test', () => {
+describe('test add data tree widget', () => {
+  it('add data tree test', () => {
     const Widget = wrapWidget(_Widget, {
       config: { exampleConfigProperty: 'a' }
     })
