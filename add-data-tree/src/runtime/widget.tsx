@@ -91,10 +91,6 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
 
   };
 
-  type ParentGroup = {
-    label: string;
-    checked: true;
-  }
 
 
   // =========================
@@ -103,7 +99,6 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
 
   const [nodes, setNodes] = React.useState<LayerNode[]>([]);
   const [jimuMapView, setJimuMapView] = React.useState(null);
-  const [parentGroup, setParentGroup] = React.useState<ParentGroup | null>(null);
 
   const activeMapWidgetId = props.useMapWidgetIds?.[0]
    // =========================
@@ -112,7 +107,6 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
 
 
   const createLayerFromItemId = (itemId: string, type: OperationalLayerType): SupportedLayer => {
-    console.log(`Creating layer from itemId: ${itemId} with type: ${type}`);
     switch (type) {
       case 'GROUP_LAYER':
         return new GroupLayer({ portalItem: { id: itemId } });
@@ -133,7 +127,6 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
   // =========================
 
   React.useEffect(() => {
-    // These may be necessary to reset to zero so that there are no duplicate if props.useDataSources changes
 
     const dataSource = props.useDataSources?.[0];
 
@@ -142,6 +135,7 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
     const manager = DataSourceManager.getInstance();
   
     const run = async () => {
+      // Set Nodes resets data loaded
       setNodes([])
       const dsSource = manager.createDataSource(dataSource.dataSourceId);
       (await dsSource).ready();
@@ -151,10 +145,6 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
       const dsType = json?.type as OperationalLayerType;
       const itemId = json?.itemId;
       const layer = createLayerFromItemId(itemId, dsType) as GroupLayer;
-      setParentGroup({
-        label: layer.title,
-        checked: true
-      });
 
       await layer.load();
       
@@ -248,7 +238,6 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
           };
       });
       setNodes(layerNodes.reverse());
-    
   };
 
   run();
@@ -312,8 +301,8 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
      return;
   }
   
-  
-  child.nestedSubLayers?.forEach((nested) => {
+  const reversedNested = [...child.nestedSubLayers].reverse();
+  reversedNested?.forEach((nested) => {
     const nestedVisible = shouldBeVisible && nested.checked;
 
     if (nestedVisible && (nested.layer instanceof VectorTileLayer || nested.layer instanceof FeatureLayer)) {
@@ -354,7 +343,8 @@ const toggleLayerNode = (currentNodes: LayerNode[], parentIndex: number) => {
   // =========================
   // LEVEL 2 - STRUCTURAL GROUP LAYER - MOUNT CHILDREN TOGGLED ON
   // =========================
-  parent.subLayers?.forEach((child) => {
+  const reversedSubLayers = [...parent.subLayers].reverse();
+  reversedSubLayers?.forEach((child) => {
 
     const childVisible = parent.checked && child.checked;
 
@@ -369,8 +359,8 @@ const toggleLayerNode = (currentNodes: LayerNode[], parentIndex: number) => {
     // =========================
     // LEVEL 3 (NESTED)
     // =========================
-
-        child.nestedSubLayers?.forEach((nested) => {
+        const reversedNested = [...child.nestedSubLayers].reverse();
+        reversedNested?.forEach((nested) => {
 
               const nestedVisible = childVisible && nested.checked;
 
