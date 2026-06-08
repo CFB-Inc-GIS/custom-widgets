@@ -50,13 +50,22 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
   // TYPES
   // =========================
 
-  type SupportedLayerType =
+  type OperationalLayerType =
   | 'MAP_SERVICE'
 
   type SupportedLayer =
   | __esri.MapImageLayer
+  | __esri.GroupLayer
   | __esri.Sublayer
 
+
+  type NestedSubLayerNode = {
+    layer: SupportedLayer | null;
+    label: string;
+    itemId: Number;
+    checked: boolean;
+    expanded?: boolean;
+  }
 
   type SubLayerNode = {
     layer: SupportedLayer | null;
@@ -64,8 +73,8 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
     itemId: Number;
     checked: boolean;
     expanded?: boolean;
-  };  
-
+    nestedSubLayers?: NestedSubLayerNode[];
+  };
 
   type LayerNode = {
     layer: SupportedLayer | null;
@@ -73,7 +82,7 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
     itemId: string;
     checked: boolean;
     expanded?: boolean;
-    subLayers: SubLayerNode[];
+    subLayers?: SubLayerNode[];
 
   };
 
@@ -88,12 +97,14 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
   const [jimuMapView, setJimuMapView] = React.useState(null);
 
   const activeMapWidgetId = props.useMapWidgetIds?.[0]
-   // =========================
+
+
+  // =========================
   // LAYER FACTORIES
   // =========================
 
 
-  const createLayerFromItem = (itemId: string, type: SupportedLayerType): SupportedLayer => {
+  const createLayerFromItemId = (itemId: string, type: OperationalLayerType): SupportedLayer => {
     switch (type) {
       case 'MAP_SERVICE':
         return new MapImageLayer({ portalItem: { id: itemId } });
@@ -109,14 +120,15 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
   React.useEffect(() => {
     // These may be necessary to reset to zero so that there are no duplicate if props.useDataSources changes
 
-    const useDs = props.useDataSources;
+    const dataSource = props.useDataSources?.[0];
 
-    if (!useDs || useDs.length === 0) return;
+    if (!dataSource) return;
 
     const manager = DataSourceManager.getInstance();
   
 
     const run = async (dataSourceId: string) => {
+
       setNodes([])
       const dsSource = manager.createDataSource(dataSourceId);
 
@@ -124,81 +136,156 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
       (await dsSource).fetchSchema();
       const ds = manager.getDataSource(dataSourceId);
       const json = ds?.getDataSourceJson?.();
-      const dsType = json?.type as SupportedLayerType;
-      const label = json?.sourceLabel ?? 'No Label';
+      const dsType = json?.type as OperationalLayerType;
       const itemId = json?.itemId;
-      const thisUrl = json?.url
-      const layer = createLayerFromItem(itemId, dsType);
-    
-      if (layer instanceof MapImageLayer) {
-            await layer.load();
-            let count = 1;
-            const subLayers = layer.sourceJSON?.layers.map((sublayer: any) => {
-              const suffixId = Number(sublayer.id)
-              const subLayerUrl = `${thisUrl}/${suffixId}`;
-              const checkedValue = count === 1;
-              count = count + 1;
-              return {
-                layer: layer.findSublayerById(suffixId),
-                label: sublayer.name,
-                itemId: suffixId,
-                checked: checkedValue
-              };
-          });
+      const label = json?.sourceLabel ?? 'No Label';
+      const layer = createLayerFromItemId(itemId, dsType) as __esri.MapImageLayer;
+      
+      await layer.load();
+      
+      const sourceLayers = layer.sourceJSON?.layers ?? [];
+      const layerLookup = new Map<number, any>();
 
-      setNodes(prev => [
-        ...prev,
-        {
-          layer,
-          label,
-          itemId,
-          checked: false,
-          subLayers
-        }
-      ]);
-    };
-  }
-    useDs.forEach((dataSource) => {
-        run(dataSource.dataSourceId)
+      sourceLayers.forEach((layer: any) => {
+        layerLookup.set(Number(layer.id), layer);
       });
 
+      const firstLevelLayers = sourceLayers.filter(
+        (layer: any) => Number(layer.parentLayerId) === -1
+      );
+ 
+      const subLayers: SubLayerNode[] = firstLevelLayers.map((sublayer: any) => {
+
+      const id = Number(sublayer.id);
+
+              const nestedSubLayers = sublayer.subLayerIds?.map((nestedId: number) => {
+                const nestedSublayer = layerLookup.get(nestedId);
+
+                return {
+                  layer: nestedSublayer.type === 'Group Layer' ? layer.findSublayerById(nestedId) : layer.findSublayerById(nestedId) as __esri.Sublayer,
+                  label: nestedSublayer.name,
+                  itemId: String(nestedId),
+                  checked: Boolean(nestedSublayer.defaultVisibility),
+                  expanded: false
+                };
+              }) ?? [];
+
+      return {
+        layer: sublayer.type === 'Group Layer' ? layer.findSublayerById(id) : layer.findSublayerById(id) as __esri.Sublayer,
+        label: sublayer.name,
+        itemId: String(id),
+        checked: Boolean(sublayer.defaultVisibility),
+        expanded: false,
+        nestedSubLayers
+      };
+
+    });
+
+      const layerNode = {
+        layer,
+        label,
+        itemId,
+        checked: false,
+        expanded: false,
+        subLayers
+      }
+
+      setNodes([layerNode]);
+  } 
+    run(dataSource.dataSourceId)
+      
   }, [props.useDataSources]);
 
 
+
+// =========================
+// NESTED SUBLAYER TOGGLE
+// =========================
+
+  const toggleNestedSubLayer = (
+  currentNodes: LayerNode[],
+  parentIndex: number,
+  childIndex: number,
+  nestedIndex: number
+) => {
+  if (!jimuMapView) return;
+  const parent = currentNodes[parentIndex];
+  const child = parent?.subLayers?.[childIndex];
+  const nested = child?.nestedSubLayers?.[nestedIndex];
+  
+  const parentVisible = parent.checked;
+  const childVisible = child.checked; 
+  const shouldBeVisible = parentVisible && childVisible && nested.checked;
+
+  const nestedLayer = nested?.layer;
+ 
+  if (shouldBeVisible) {
+    nestedLayer.visible = true;
+    return;
+  } else if (!shouldBeVisible) {
+    nestedLayer.visible = false;
+    return;
+  }
+};
 // =========================
 // SUBLAYER TOGGLE
 // =========================
 
   const toggleSubLayer = (
+  currentNodes: LayerNode[],
   parentIndex: number,
-  childIndex: number,
-  isChecked: boolean
+  childIndex: number
 ) => {
   if (!jimuMapView) return;
-  const parent = nodes[parentIndex];
+  const parent = currentNodes[parentIndex];
   const child = parent?.subLayers?.[childIndex];
+  const parentVisible = parent.checked; 
+  const shouldBeVisible = parentVisible && child.checked;
   
-  const layer = child.layer
-  layer.visible = isChecked;
+  if (child.layer.type === "group" && shouldBeVisible) {
+    
+    child.layer.visible = shouldBeVisible;
+    
+    const nestedSubLayers = [...child.nestedSubLayers];
+    nestedSubLayers.forEach(nested => {
+      const nestedVisible = shouldBeVisible && nested.checked;
+      const nestedLayer = nested.layer as __esri.Sublayer;
+      if (nestedVisible) {
+        nestedLayer.visible = true;
+      } else {
+        nestedLayer.visible = false;
+      }
+      return;
+  })
+  return;
+ };
+  if (shouldBeVisible && child.layer.type == "sublayer") {
+     child.layer.visible = true;
+     return;
+  } else if (!shouldBeVisible && child.layer.type == "sublayer") {
+    child.layer.visible = false;
+    return;
+  }
+  
 };
 
 // =========================
-// GROUP NODE TOGGLE
+// LAYER NODE TOGGLE
 // =========================
 
-const toggleGroupNode = (parentIndex: number, isChecked:boolean) => {
+const toggleLayerNode = (currentNodes: LayerNode[], parentIndex: number) => {
   if (!jimuMapView) return;
   
-  const mapImage = nodes[parentIndex].layer;
+  const parent = currentNodes[parentIndex];
 
-  if (!mapImage) return;
+  if (!parent.layer) return;
 
-  if (!isChecked) {
-    jimuMapView.view.map.remove(mapImage);
+  if (!parent.checked) {
+    jimuMapView.view.map.remove(parent.layer);
   }
 
-  if (isChecked) {
-    jimuMapView.view.map.add(mapImage);
+  if (parent.checked) {
+    jimuMapView.view.map.add(parent.layer);
   }
 }
 
@@ -242,7 +329,34 @@ const rootItemJson = React.useMemo(() => {
           setTargetLayer(child)
           handleEllipsisClick()
       }}
-  ]
+  ],
+        itemChildren: (sub.nestedSubLayers ?? []).map((nested, nestedIndex) => ({
+          itemKey: `nested-${parentIndex}-${childIndex}-${nestedIndex}`,
+          itemStateTitle: nested.label,
+          itemStateChecked: nested.checked?? false,
+          itemStateExpanded: nested.expanded ?? false,
+          isItemSelectable: true,
+          itemStateCommands: [
+            {
+              name: 'ellipsis',
+              label: "Options",
+              visible: true,
+              state: ['default'],
+              action: () => {
+                const el = document.activeElement as HTMLElement;
+                const rect = el.getBoundingClientRect();
+                setOptions(true)
+                setOptionsTop(rect.bottom)
+                setOptionsLeft(rect.left)
+                const parent = nodes[parentIndex];
+                const child = parent?.subLayers?.[childIndex];
+                const nestedChild = child?.nestedSubLayers?.[nestedIndex];
+                setTargetLayer(nestedChild)
+                handleEllipsisClick()
+              }
+            }
+          ]
+        }))
       })),
     
     }))
@@ -265,10 +379,10 @@ const handleTreeUpdate = (actionData: any) => {
   // Create a tuple that contains whether it is first level group node, sub layer, the index of the layer, and the index of the parent if any
   // Default tuple values
   const currentItem = actionData?.currentItemJson;
-  let interactionType: 'parent' | 'child' | null = null;
+  let interactionType: 'parent' | 'child' | 'nested' | null = null;
   let parentIndex: number | null = null;
   let childIndex: number | null = null;
-  let isChecked: boolean | null = null;
+  let nestedIndex: number | null = null;
 
   if (currentItem) {
     const key = currentItem.itemKey; // e.g. "parent-0" or "child-0-2"
@@ -284,47 +398,64 @@ const handleTreeUpdate = (actionData: any) => {
       parentIndex = Number(parts[1]);
       childIndex = Number(parts[2]);
     }
-  }
 
-  console.log("Action Data", actionData)
-  
+    if (parts[0] === 'nested') {
+      interactionType = 'nested';
+      parentIndex = Number(parts[1]);
+      childIndex = Number(parts[2]);
+      nestedIndex = Number(parts[3]);
+    }
+  }
 
   const currentTreeStateRaw = actionData.itemJsons[actionData.itemJsons.length - 1];
 
-  const updatedGroupNodes = currentTreeStateRaw.itemChildren.map((parent: any, pIndex: number) => {
-    const groupNode = nodes[pIndex];
+  // FIRST LEVEL: PARENT NODES
+  const updatedLayerNodes = currentTreeStateRaw.itemChildren.map((parent: any, pIndex: number) => {
+    const layerNode = nodes[pIndex];
+    
+        // SECOND LEVEL: CHILD NODES
+        const updatedSubLayers = parent.itemChildren.map((child: any, cIndex: number) => {
+          const subLayer = layerNode.subLayers[cIndex];
 
-    if (interactionType == 'parent' && parentIndex == pIndex) {
-        isChecked = parent.itemStateChecked;
-      }
-
-    const currentStateSubLayers = parent.itemChildren.map((child: any, cIndex: number) => {
-      const subLayer = groupNode.subLayers[cIndex];
-      if (interactionType == 'child' && childIndex == cIndex) {
-        isChecked = child.itemStateChecked;
-      }
-
-      return {
-        ...subLayer, // 👈 ALWAYS preserve prior state
-        checked: child.itemStateChecked,
-        expanded: child.itemStateExpanded
-      };
-    });
+                // THIRD LEVEL: NESTED NODES
+                const updatedNestedSubLayers = child.itemChildren.map((nested: any, nIndex: number) => {
+                  const nestedSubLayer = subLayer.nestedSubLayers[nIndex];
+                  return {
+                    ...nestedSubLayer,
+                    checked: nested.itemStateChecked,
+                    expanded: nested.itemStateExpanded
+                  };
+                });
+                
+          return {
+            ...subLayer, // 👈 ALWAYS preserve prior state
+            checked: child.itemStateChecked,
+            expanded: child.itemStateExpanded,
+            nestedSubLayers: updatedNestedSubLayers
+          };
+        });
 
     return {
-      ...groupNode, // 👈 preserve full history
+      ...layerNode, // 👈 preserve full history
       checked: parent.itemStateChecked,
       expanded: parent.itemStateExpanded,
-      subLayers: currentStateSubLayers
+      subLayers: updatedSubLayers
     };
   });
-  setNodes(updatedGroupNodes); 
-
-  if (interactionType == 'child')
-  { toggleSubLayer(parentIndex, childIndex, isChecked) } 
-  else if (interactionType == 'parent') 
-  { toggleGroupNode(parentIndex, isChecked)}
+ 
+  setNodes(updatedLayerNodes); 
+  console.log('Updated Layer Nodes:', updatedLayerNodes);
+  if (interactionType == 'nested') {
+  toggleNestedSubLayer(updatedLayerNodes, parentIndex, childIndex, nestedIndex)
+  }
+  else if (interactionType == 'child') {
+  toggleSubLayer(updatedLayerNodes,parentIndex, childIndex) 
+  }
+  else if (interactionType == 'parent') {
+  toggleLayerNode(updatedLayerNodes, parentIndex)
+  }
 };
+
 
 // =========================
 // RENDER
