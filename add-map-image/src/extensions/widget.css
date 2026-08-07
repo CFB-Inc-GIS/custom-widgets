@@ -1,8 +1,9 @@
 
 .jimu-tree .icon-btn > span.icon-btn-sizer.jimu-button-icon.jimu-button-icon-icon-size-sm {
-  border: 2px solid #404040 !important;
-  width: 16px !important;
-  height: 16px !important;
+  border: 2px solid #999999 !important;
+  border-radius: 3px;   /* subtle UI rounding */
+  width: 12px !important;
+  height: 12px !important;
 }
 
 .jimu-tree .icon-btn > span.jimu-button-icon-icon-size-sm svg {
@@ -62,7 +63,7 @@
 .widget-content {
   height: 100%;        /* or fixed value like 400px */
   max-height: 100%;
-  overflow-y: auto;
+  overflow-y: hidden;
   overflow-x: hidden;
 }
 

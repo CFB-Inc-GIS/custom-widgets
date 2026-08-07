@@ -142,7 +142,9 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
       (await dsSource).fetchSchema();
       const ds = manager.getDataSource(dataSource.dataSourceId);
       const json = ds?.getDataSourceJson?.();
+      console.log(json)
       const dsType = json?.type as OperationalLayerType;
+      console.log('DataSource Type:', dsType);
       const itemId = json?.itemId;
       const layer = createLayerFromItemId(itemId, dsType) as GroupLayer;
 
@@ -195,7 +197,6 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
 
                     nestedSubLayers =
                       nestedGroup.layers?.toArray?.().map((nested: any) => {
-
                         const nestedItemId = nested.portalItem?.id || null;
 
                         const nestedResolvedLayer =
@@ -293,10 +294,10 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
   // =========================
   // OPERATIONAL LAYER TOGGLE IF LAYER IS TILE LAYER OR FEATURE LAYER
   // =========================
-  if (shouldBeVisible && (child.layer instanceof VectorTileLayer || child.layer instanceof FeatureLayer)) {
+  if (shouldBeVisible && (child.layer instanceof VectorTileLayer || child.layer instanceof TileLayer || child.layer instanceof FeatureLayer)) {
      jimuMapView.view.map.add(child.layer);
      return;
-  } else if (!shouldBeVisible && (child.layer instanceof VectorTileLayer || child.layer instanceof FeatureLayer)) {
+  } else if (!shouldBeVisible && (child.layer instanceof VectorTileLayer || child.layer instanceof TileLayer || child.layer instanceof FeatureLayer)) {
      jimuMapView.view.map.remove(child.layer);
      return;
   }
@@ -305,10 +306,10 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
   reversedNested?.forEach((nested) => {
     const nestedVisible = shouldBeVisible && nested.checked;
 
-    if (nestedVisible && (nested.layer instanceof VectorTileLayer || nested.layer instanceof FeatureLayer)) {
+    if (nestedVisible && (nested.layer instanceof VectorTileLayer || nested.layer instanceof TileLayer || nested.layer instanceof FeatureLayer)) {
       jimuMapView.view.map.add(nested.layer);
       return;
-    } else if (!nestedVisible && (nested.layer instanceof VectorTileLayer || nested.layer instanceof FeatureLayer)) {
+    } else if (!nestedVisible && (nested.layer instanceof VectorTileLayer || nested.layer instanceof TileLayer || nested.layer instanceof FeatureLayer)) {
       jimuMapView.view.map.remove(nested.layer);
       return;
     }
@@ -332,10 +333,10 @@ const toggleLayerNode = (currentNodes: LayerNode[], parentIndex: number) => {
   // =========================
   // LEVEL 1 OPERATRIONAL LAYER
   // =========================
-  if (parent.checked && (parent.layer instanceof VectorTileLayer || parent.layer instanceof FeatureLayer)) {
+  if (parent.checked && (parent.layer instanceof VectorTileLayer || parent.layer instanceof TileLayer ||parent.layer instanceof FeatureLayer)) {
       jimuMapView.view.map.add(parent.layer);
       return;
-  } else if (!parent.checked && (parent.layer instanceof VectorTileLayer || parent.layer instanceof FeatureLayer)) {
+  } else if (!parent.checked && (parent.layer instanceof VectorTileLayer || parent.layer instanceof TileLayer || parent.layer instanceof FeatureLayer)) {
       jimuMapView.view.map.remove(parent.layer);
       return;
   }
@@ -348,10 +349,10 @@ const toggleLayerNode = (currentNodes: LayerNode[], parentIndex: number) => {
 
     const childVisible = parent.checked && child.checked;
 
-    if (childVisible && (child.layer instanceof VectorTileLayer || child.layer instanceof FeatureLayer)) {
+    if (childVisible && (child.layer instanceof VectorTileLayer || child.layer instanceof TileLayer || child.layer instanceof FeatureLayer)) {
         jimuMapView.view.map.add(child.layer);
         return;
-    } else if (!childVisible && (child.layer instanceof VectorTileLayer || child.layer instanceof FeatureLayer)) {
+    } else if (!childVisible && (child.layer instanceof VectorTileLayer || child.layer instanceof TileLayer || child.layer instanceof FeatureLayer)) {
         jimuMapView.view.map.remove(child.layer);
         return;
     }
@@ -364,10 +365,10 @@ const toggleLayerNode = (currentNodes: LayerNode[], parentIndex: number) => {
 
               const nestedVisible = childVisible && nested.checked;
 
-              if (nestedVisible && (nested.layer instanceof VectorTileLayer || nested.layer instanceof FeatureLayer)) {
+              if (nestedVisible && (nested.layer instanceof VectorTileLayer || nested.layer instanceof TileLayer || nested.layer instanceof FeatureLayer)) {
                 jimuMapView.view.map.add(nested.layer);
                 return;
-              } else if (!nestedVisible && (nested.layer instanceof VectorTileLayer || nested.layer instanceof FeatureLayer)) {
+              } else if (!nestedVisible && (nested.layer instanceof VectorTileLayer || nested.layer instanceof TileLayer || nested.layer instanceof FeatureLayer)) {
                 jimuMapView.view.map.remove(nested.layer);
                 return;
               }
@@ -550,7 +551,6 @@ const handleTreeUpdate = (actionData: any) => {
 // =========================
 
  return (
-  <div>
   <div style={{ width: '100%', height: '100%', padding: '2px', boxSizing: 'border-box' }}>
     <JimuMapViewComponent
       useMapWidgetId={activeMapWidgetId}
@@ -646,7 +646,6 @@ const handleTreeUpdate = (actionData: any) => {
       </div>,
       document.body
     )}
-  </div>
   </div>
 )
 };
