@@ -427,7 +427,6 @@ const handleTreeUpdate = (actionData: any) => {
         rootItemJson={rootItemJson}
         onUpdateItem={handleTreeUpdate}
       />
-
       {options && optionsLeft && optionsTop && createPortal(
       <div ref={optionsMenuRef} className='optionsMenu'
         style={{
