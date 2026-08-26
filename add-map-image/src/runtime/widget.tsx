@@ -292,6 +292,27 @@ const toggleLayerNode = (currentNodes: LayerNode[], parentIndex: number) => {
 // =========================
 // DEFINES THE TREE CONTENT AND ACTION ON THE OPTIONS MENU
 // =========================
+const hasNestedSubLayers = (layer: SubLayerNode | undefined): boolean => {
+  if (!layer) return false;
+
+  return (layer.nestedSubLayers?.length ?? 0) === 0;
+};
+
+const createOptionsCommand = (targetLayer: SubLayerNode) => ({
+  name: 'ellipsis',
+  label: 'Options',
+  visible: true,
+  state: ['default'],
+  action: () => {
+    const el = document.activeElement as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    setOptions(true);
+    setOptionsTop(rect.bottom);
+    setOptionsLeft(rect.left);
+    setTargetLayer(targetLayer);
+    handleEllipsisClick();
+  }
+});
 
 const rootItemJson = React.useMemo(() => {
   return {
@@ -311,51 +332,22 @@ const rootItemJson = React.useMemo(() => {
         itemStateChecked: sub.checked ?? false,
         itemStateExpanded: sub.expanded ?? false,
         isItemSelectable: true,
-        itemStateCommands: [
-      {
-        name: 'ellipsis',
-        label: "Options",
-        visible: true,
-        state: ['default'],
-        action: () => {
-          const el = document.activeElement as HTMLElement;
-          const rect = el.getBoundingClientRect();
-          setOptions(true)
-          setOptionsTop(rect.bottom)
-          setOptionsLeft(rect.left)
-          const parent = nodes[parentIndex];
-          const child = parent?.subLayers?.[childIndex];
-        
-          setTargetLayer(child)
-          handleEllipsisClick()
-      }}
-  ],
+        ...(hasNestedSubLayers(sub)
+        ? {
+            itemStateCommands: [createOptionsCommand(sub)]
+          }
+        : {}),
         itemChildren: (sub.nestedSubLayers ?? []).map((nested, nestedIndex) => ({
           itemKey: `nested-${parentIndex}-${childIndex}-${nestedIndex}`,
           itemStateTitle: nested.label,
           itemStateChecked: nested.checked?? false,
           itemStateExpanded: nested.expanded ?? false,
           isItemSelectable: true,
-          itemStateCommands: [
-            {
-              name: 'ellipsis',
-              label: "Options",
-              visible: true,
-              state: ['default'],
-              action: () => {
-                const el = document.activeElement as HTMLElement;
-                const rect = el.getBoundingClientRect();
-                setOptions(true)
-                setOptionsTop(rect.bottom)
-                setOptionsLeft(rect.left)
-                const parent = nodes[parentIndex];
-                const child = parent?.subLayers?.[childIndex];
-                const nestedChild = child?.nestedSubLayers?.[nestedIndex];
-                setTargetLayer(nestedChild)
-                handleEllipsisClick()
-              }
+          ...(hasNestedSubLayers(nested)
+          ? {
+              itemStateCommands: [createOptionsCommand(nested)]
             }
-          ]
+          : {})
         }))
       })),
     

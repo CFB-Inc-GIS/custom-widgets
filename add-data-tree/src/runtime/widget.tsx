@@ -23,7 +23,7 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
   const [optionsLeft, setOptionsLeft] = React.useState(0);
   const optionsMenuRef = React.useRef<HTMLDivElement | null>(null);
   const [transparencyPanel, setTransparencyPanel] = React.useState(false);
-  const [targetLayer, setTargetLayer] = React.useState<SubLayerNode | null>(null);
+  const [targetLayer, setTargetLayer] = React.useState<LayerNode | null>(null);
   const [, forceRender] = React.useState(0);
 
   const handleEllipsisClick = () => {
@@ -101,7 +101,8 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
   const [jimuMapView, setJimuMapView] = React.useState(null);
 
   const activeMapWidgetId = props.useMapWidgetIds?.[0]
-   // =========================
+
+  // =========================
   // LAYER FACTORIES
   // =========================
 
@@ -382,6 +383,32 @@ const toggleLayerNode = (currentNodes: LayerNode[], parentIndex: number) => {
 // =========================
 // DEFINES THE TREE CONTENT AND ACTION ON THE OPTIONS MENU
 // =========================
+const isDataLayer = (layer: SupportedLayer | undefined): boolean => {
+  if (!layer) return false;
+
+  return (
+    layer.type === 'feature' ||
+    layer.type === 'tile' ||
+    layer.type === 'vector-tile'
+  );
+};
+
+const createOptionsCommand = (targetLayer: LayerNode) => ({
+  name: 'ellipsis',
+  label: 'Options',
+  visible: true,
+  state: ['default'],
+  action: () => {
+    const el = document.activeElement as HTMLElement;
+    const rect = el.getBoundingClientRect();
+
+    setOptions(true);
+    setOptionsTop(rect.bottom);
+    setOptionsLeft(rect.left);
+    setTargetLayer(targetLayer);
+    handleEllipsisClick();
+  }
+});
 
 const rootItemJson = React.useMemo(() => {
   return {
@@ -393,6 +420,11 @@ const rootItemJson = React.useMemo(() => {
       itemStateChecked: node.checked ?? false,
       itemStateExpanded: node.expanded ?? false,
       isItemSelectable: true,
+      ...(isDataLayer(node.layer)
+  ? {
+      itemStateCommands: [createOptionsCommand(node)]
+    }
+  : {}),
 
       // 👇 ensure this is ALWAYS a valid array
       itemChildren: (node.subLayers ?? []).map((sub, childIndex) => ({
@@ -401,51 +433,22 @@ const rootItemJson = React.useMemo(() => {
         itemStateChecked: sub.checked ?? false,
         itemStateExpanded: sub.expanded ?? false,
         isItemSelectable: true,
-        itemStateCommands: [
-      {
-        name: 'ellipsis',
-        label: "Options",
-        visible: true,
-        state: ['default'],
-        action: () => {
-          const el = document.activeElement as HTMLElement;
-          const rect = el.getBoundingClientRect();
-          setOptions(true)
-          setOptionsTop(rect.bottom)
-          setOptionsLeft(rect.left)
-          const parent = nodes[parentIndex];
-          const child = parent?.subLayers?.[childIndex];
-        
-          setTargetLayer(child)
-          handleEllipsisClick()
-      }}
-  ],
+        ...(isDataLayer(sub.layer)
+        ? {
+            itemStateCommands: [createOptionsCommand(sub)]
+          }
+        : {}),
         itemChildren: (sub.nestedSubLayers ?? []).map((nested, nestedIndex) => ({
           itemKey: `nested-${parentIndex}-${childIndex}-${nestedIndex}`,
           itemStateTitle: nested.label,
           itemStateChecked: nested.checked?? false,
           itemStateExpanded: nested.expanded ?? false,
           isItemSelectable: true,
-          itemStateCommands: [
-            {
-              name: 'ellipsis',
-              label: "Options",
-              visible: true,
-              state: ['default'],
-              action: () => {
-                const el = document.activeElement as HTMLElement;
-                const rect = el.getBoundingClientRect();
-                setOptions(true)
-                setOptionsTop(rect.bottom)
-                setOptionsLeft(rect.left)
-                const parent = nodes[parentIndex];
-                const child = parent?.subLayers?.[childIndex];
-                const nestedChild = child?.nestedSubLayers?.[nestedIndex];
-                setTargetLayer(nestedChild)
-                handleEllipsisClick()
-              }
+          ...(isDataLayer(nested.layer)
+          ? {
+              itemStateCommands: [createOptionsCommand(nested)]
             }
-          ]
+          : {})
         }))
       })),
     
