@@ -155,13 +155,15 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
       const checkedValue = (sublayer: any): boolean => {
         return Boolean(sublayer.visible);
       };
+
+      const checked = checkedValue(sublayer);
       
       return {
         layer: url ? createLayerFromUrl(url, sublayer.type) : null,
         label: sublayer.title,
         itemUrl: url ?? '',   // ✅ correct property
-        checked: checkedValue(sublayer),
-        visibility: checkedValue(sublayer)
+        checked: checked,
+        visibility: checked
       };
     });
 
@@ -296,6 +298,8 @@ const handleTreeUpdate = (actionData: any) => {
   // Create a tuple that contains whether it is first level group node, sub layer, the index of the layer, and the index of the parent if any
   // Default tuple values
   const currentItem = actionData?.currentItemJson;
+
+
   let interactionType: 'parent' | 'child' | null = null;
   let parentIndex: number | null = null;
   let childIndex: number | null = null;
@@ -303,6 +307,7 @@ const handleTreeUpdate = (actionData: any) => {
 
   if (currentItem) {
     const key = currentItem.itemKey; // e.g. "parent-0" or "child-0-2"
+
     const parts = key.split('-');
 
     if (parts[0] === 'parent') {
@@ -310,11 +315,13 @@ const handleTreeUpdate = (actionData: any) => {
       parentIndex = Number(parts[1]);
     }
 
+
     if (parts[0] === 'child') {
       interactionType = 'child';
       parentIndex = Number(parts[1]);
       childIndex = Number(parts[2]);
     }
+
   }
 
   const currentTreeStateRaw = actionData.itemJsons[actionData.itemJsons.length - 1];
@@ -328,7 +335,7 @@ const handleTreeUpdate = (actionData: any) => {
 
     const currentStateSubLayers = parent.itemChildren.map((child: any, cIndex: number) => {
       const subLayer = groupNode.subLayers[cIndex];
-      if (interactionType == 'child' && childIndex == cIndex) {
+      if (interactionType == 'child' && parentIndex == pIndex && childIndex == cIndex) {
         isChecked = child.itemStateChecked;
       }
 
@@ -336,9 +343,10 @@ const handleTreeUpdate = (actionData: any) => {
         ...subLayer, // 👈 ALWAYS preserve prior state
         checked: child.itemStateChecked,
         expanded: child.itemStateExpanded
-      };
+      }; 
     });
 
+    
     return {
       ...groupNode, // 👈 preserve full history
       checked: parent.itemStateChecked,
