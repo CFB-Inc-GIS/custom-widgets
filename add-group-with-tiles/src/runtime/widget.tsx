@@ -136,7 +136,6 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
   
 
     const run = async (dataSourceId: string) => {
-      setNodes([])
       const dsSource = manager.createDataSource(dataSourceId);
 
       (await dsSource).ready();
@@ -149,7 +148,7 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
       const layer = createLayerFromItem(itemId, dsType);
       if (layer instanceof GroupLayer) {
       await layer.load();
-      const subLayers = layer.layers.toArray().map((sublayer: any) => {
+      const subLayers = layer.layers.toArray().reverse().map((sublayer: any) => {
       const url = sublayer.url;
 
       const checkedValue = (sublayer: any): boolean => {
@@ -180,10 +179,15 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
       ]);
     };
   }
-    useDs.forEach((dataSource) => {
-        run(dataSource.dataSourceId)
-      });
 
+  const loadDataSources = async () => {
+    setNodes([]); // Reset nodes before loading new data sources
+    for (const dS of useDs) {
+      await run(dS.dataSourceId);
+    }
+  };
+
+  loadDataSources();
   }, [props.useDataSources]);
 
 
