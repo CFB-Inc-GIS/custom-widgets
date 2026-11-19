@@ -1,5 +1,6 @@
 import { React, AllWidgetProps, DataSourceManager } from 'jimu-core';
 import MapImageLayer from "@arcgis/core/layers/MapImageLayer.js"
+import TileLayer from "@arcgis/core/layers/TileLayer.js";
 import { JimuMapViewComponent } from 'jimu-arcgis';
 import { Tree, TreeAlignmentType, TreeCollapseStyle, TreeStyle } from 'jimu-ui/basic/list-tree'
 import '../extensions/widget.css';
@@ -52,11 +53,13 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
 
   type OperationalLayerType =
   | 'MAP_SERVICE'
+  | 'tile'
 
   type SupportedLayer =
   | __esri.MapImageLayer
   | __esri.GroupLayer
   | __esri.Sublayer
+  | __esri.TileLayer
 
 
   type NestedSubLayerNode = {
@@ -113,6 +116,16 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
     }
   };
 
+    const createLayerFromItemId2 = (itemId: string, type: OperationalLayerType): SupportedLayer => {
+    switch (type) {
+      case 'MAP_SERVICE':
+        return new TileLayer({ portalItem: { id: itemId } });
+      default:
+        throw new Error(`Unsupported type: ${type}`);
+    }
+  };
+
+
   // =========================
   // DATA LOADING
   // =========================
@@ -135,14 +148,17 @@ export default function Widget(this: any, props: AllWidgetProps<any>) {
       (await dsSource).ready();
       (await dsSource).fetchSchema();
       const ds = manager.getDataSource(dataSourceId);
+      console.log(ds)
       const json = ds?.getDataSourceJson?.();
+      console.log(json)
       const dsType = json?.type as OperationalLayerType;
+      console.log(dsType)
       const itemId = json?.itemId;
+      console.log(itemId)
       const label = json?.sourceLabel ?? 'No Label';
       const layer = createLayerFromItemId(itemId, dsType) as __esri.MapImageLayer;
-      
       await layer.load();
-      
+
       const sourceLayers = layer.sourceJSON?.layers ?? [];
       const layerLookup = new Map<number, any>();
 
@@ -495,7 +511,17 @@ const handleTreeUpdate = (actionData: any) => {
           const value = Number((event.target as HTMLInputElement).value);
           if (!targetLayer?.layer) return;
           const opacity = value / 100;
-          targetLayer.layer.opacity = opacity;
+          const selectedLayer = targetLayer.layer;
+          const typeCheck = selectedLayer.sourceJSON?.type
+          console.log("type " + typeCheck)
+          if (typeCheck === "Raster Layer")
+          {
+            const parentLayer = (targetLayer.layer as __esri.Sublayer).layer;
+            parentLayer.opacity = opacity;
+          }
+          else {
+           targetLayer.layer.opacity = opacity;
+          }
         }}
         size="default"
         step={1}
